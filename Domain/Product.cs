@@ -1,26 +1,26 @@
 ﻿using Azure;
 using Azure.Data.Tables;
-using Microsoft.WindowsAzure.Storage;
+using System.Diagnostics;
 
 namespace Domain
 {
     public class Product : ITableEntity
     {
-        public string PartitionKey { get; set; }
-        public string RowKey { get; set; }
+        public string PartitionKey { get; set; } = string.Empty;
+        public string RowKey { get; set; } = string.Empty;
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
 
-        public string Name { get; set; }
-        public decimal Price { get; set; }
-
+        public string Name { get; set; } = string.Empty;
+        public double Price { get; set; }
+        
         //required for deserialisation
         public Product()
         {
 
         }
 
-        public Product(string partitionKey, string rowKey, string name, decimal price)
+        public Product(string partitionKey, string rowKey, string name, double price)
         {
             PartitionKey = partitionKey;
             RowKey = rowKey;
@@ -28,31 +28,5 @@ namespace Domain
             Price = price;
         }
 
-        // Required for ITableEntity
-        public void ReadEntity(IDictionary<string, object> properties, OperationContext operationContext)
-        {
-            PartitionKey = properties[nameof(PartitionKey)].ToString();
-            RowKey = properties[nameof(RowKey)].ToString();
-            Timestamp = (DateTimeOffset?)properties[nameof(Timestamp)];
-            ETag = (ETag)properties[nameof(ETag)];
-
-            Name = properties[nameof(Name)].ToString();
-            Price = Convert.ToDecimal(properties[nameof(Price)]);
-        }
-
-        public IDictionary<string, object> WriteEntity(OperationContext operationContext)
-        {
-            var properties = new Dictionary<string, object>
-        {
-            { nameof(PartitionKey), PartitionKey },
-            { nameof(RowKey), RowKey },
-            { nameof(Timestamp), Timestamp },
-            { nameof(ETag), ETag },
-            { nameof(Name), Name },
-            { nameof(Price), Price }
-        };
-
-            return properties;
-        }
     }
 }

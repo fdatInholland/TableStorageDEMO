@@ -1,7 +1,6 @@
 ﻿
 using Azure;
 using Azure.Data.Tables;
-using Azure.Storage.Blobs.Models;
 using Domain;
 
 namespace ConsoleApp1
@@ -13,38 +12,59 @@ namespace ConsoleApp1
 
         static async Task Main(string[] args)
         {
-            // Create a new TableClient instance
+            // Create a new TableServiceClient instance
             var serviceClient = new TableServiceClient(ConnectionString);
             var tableClient = serviceClient.GetTableClient(TableName);
 
             // Create a table if it doesn't exist
-            await tableClient.CreateIfNotExistsAsync();
+            try
+            {
+                //include retry policy to handle transient failures
+                await tableClient.CreateIfNotExistsAsync();
+            }
+            catch (RequestFailedException ex) 
+            {
 
-            //Insert new product
-            Product newproduct = new Product("Electronics", "12345", "Laptop", 999.99m);
-            await tableClient.AddEntityAsync(newproduct).ConfigureAwait(false);
-
-            // Retrieve the entity
-
-            var retrievedProduct = await tableClient.GetEntityAsync<Product>("Electronics", "12345");
-            Console.WriteLine($"Retrieved product: {retrievedProduct.Value.Name}, Price: {retrievedProduct.Value.Price.ToString()}");
+            }
 
 
-            // Update the entity
-            Product updateProduct = new Product("Electronics", "12345", "Laptop", 899.99m);
-            await tableClient.UpdateEntityAsync(updateProduct, ETag.All, TableUpdateMode.Replace);
+            //// 1. Insert new product (Price stored as double)
+            Product newProduct = new Product("Electronics", "12345", "Laptop", 999.99);
+            await tableClient.AddEntityAsync(newProduct).ConfigureAwait(false);
 
-            //filtering
-            var filter = TableClient.CreateQueryFilter($"Price gt {400}");
+            //// 2. Retrieve the entity
+            Product retrievedProduct = await tableClient.GetEntityAsync<Product>("Electronics", "12345");
+            Console.WriteLine($"Retrieved product: {retrievedProduct.Name}, Price: {retrievedProduct.Price}");
 
-            // Execute the query
-            var entities = tableClient.QueryAsync<Product>(filter);
+            // 3. Update the entity
+            try
+            {
+                Product updateProduct = new Product("Electronics", "12345", "Laptop", 899.99);
 
-            var result = new List<Product>();
+                Response response = await tableClient.UpsertEntityAsync(updateProduct, TableUpdateMode.Replace);
+                Console.WriteLine($"Update succeeded with HTTP Status: {response.Status}");
+            }
+            catch (RequestFailedException ex)
+            {
+                Console.WriteLine($"Update failed: {ex.Status} - {ex.ErrorCode}");
+                Console.WriteLine(ex.Message);
+            }
+
+            // 4. Filtering (Pass double value 400.0d to match double schema)
+            double minPrice = 400.0;
+            string filter = TableClient.CreateQueryFilter($"Price gt {minPrice}");
+
+            // 5. Execute the query asynchronously
+            AsyncPageable<Product> entities = tableClient.QueryAsync<Product>(filter);
+
+            List<Product> Productresults = new List<Product>();
             await foreach (var entity in entities)
             {
-                result.Add(entity);
+                Productresults.Add(entity);
             }
+
+            Console.WriteLine($"Found {Productresults.Count} products matching the filter.");
         }
     }
 }
+
